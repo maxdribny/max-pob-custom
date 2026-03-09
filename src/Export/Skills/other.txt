@@ -377,6 +377,7 @@ local skills, mod, flag, skill = ...
 #flags spell
 #mods
 
+#noGem
 #skill SupportDivineBlessing
 	fromItem = true,
 	statMap = {
