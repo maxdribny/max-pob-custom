@@ -1,5 +1,32 @@
 # Changelog
 
+## [beta](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2/tree/beta) (2026/03/20)
+
+[Full Changelog](https://github.com/PathOfBuildingCommunity/PathOfBuilding/compare/v2.63.0...beta)
+
+
+## What's Changed
+### New to Path of Building
+- Add support for Lethal Dose support [\#9648](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9648) ([majochem](https://github.com/majochem))
+- Add Life Recharge to sidebar when using Eternal Youth [\#9658](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9658) ([LocalIdentity](https://github.com/LocalIdentity))
+### Fixed Calculations
+- Fix Cast while Channelling trigger interval being rounded to tick rate [\#9650](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9650) ([Paliak](https://github.com/Paliak))
+- Fix Bleed chance over 100% scaling Vicious Skewering Impale effect [\#9654](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9654) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Molten Strike of the Zenith Total Weighted Ball Average calc [\#9655](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9655) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Generals Cry damage calculation with some skills [\#9663](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9663) ([LocalIdentity](https://github.com/LocalIdentity))
+### Fixed Behaviours
+- Fix Replica Dragonfang's Flight not working with transfigured Lightning Tendrils [\#9652](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9652) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Earthbreaker Totems Slam skills benefiting from Exert bonuses [\#9653](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9653) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Exposure mods on Balance of Terror not working [\#9656](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9656) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Ahuana's Bite and Bonechill's "inc damage taken" mods stacking [\#9659](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9659) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Resistance Shrine not granting max Chaos Resistance [\#9661](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9661) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Animate Weapon of Self Reflection not granting weapon mods to minion [\#9662](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9662) ([LocalIdentity](https://github.com/LocalIdentity))
+### Accuracy Improvements
+- Fix Perfidy missing 3.25.0 changes [\#9657](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9657) ([LocalIdentity](https://github.com/LocalIdentity))
+- Fix Summon Reapers and Animate Guardian missing gem tooltip lines [\#9660](https://github.com/PathOfBuildingCommunity/PathOfBuilding/pull/9660) ([LocalIdentity](https://github.com/LocalIdentity))
+
+
+
 ## [v2.63.0](https://github.com/PathOfBuildingCommunity/PathOfBuilding-PoE2/tree/v2.63.0) (2026/03/15)
 
 [Full Changelog](https://github.com/PathOfBuildingCommunity/PathOfBuilding/compare/v2.62.0...v2.63.0)

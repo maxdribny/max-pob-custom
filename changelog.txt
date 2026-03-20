@@ -1,3 +1,28 @@
+VERSION[beta][2026/03/20]
+
+--- New to Path of Building ---
+* Add support for Lethal Dose support (majochem)
+* Add Life Recharge to sidebar when using Eternal Youth (LocalIdentity)
+
+--- Fixed Calculations ---
+* Fix Cast while Channelling trigger interval being rounded to tick rate (Paliak)
+* Fix Bleed chance over 100% scaling Vicious Skewering Impale effect (LocalIdentity)
+* Fix Molten Strike of the Zenith Total Weighted Ball Average calc (LocalIdentity)
+* Fix Generals Cry damage calculation with some skills (LocalIdentity)
+
+--- Fixed Behaviours ---
+* Fix Replica Dragonfang's Flight not working with transfigured Lightning Tendrils (LocalIdentity)
+* Fix Earthbreaker Totems Slam skills benefiting from Exert bonuses (LocalIdentity)
+* Fix Exposure mods on Balance of Terror not working (LocalIdentity)
+* Fix Ahuana's Bite and Bonechill's "inc damage taken" mods stacking (LocalIdentity)
+* Fix Resistance Shrine not granting max Chaos Resistance (LocalIdentity)
+* Fix Animate Weapon of Self Reflection not granting weapon mods to minion (LocalIdentity)
+
+--- Accuracy Improvements ---
+* Fix Perfidy missing 3.25.0 changes (LocalIdentity)
+* Fix Summon Reapers and Animate Guardian missing gem tooltip lines (LocalIdentity)
+
+
 VERSION[2.63.0][2026/03/15]
 
 --- New to Path of Building ---
