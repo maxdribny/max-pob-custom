@@ -141,6 +141,7 @@ local CompareTabClass = newClass("CompareTab", "ControlHost", "Control", functio
 	self.comparePowerProgress = 0         -- 0-100
 	self.comparePowerDirty = false        -- flag to restart calculation
 	self.comparePowerCompareId = nil      -- track which compare entry was calculated
+	self.comparePowerListSynced = false   -- prevents redundant SetReport calls
 
 	-- Pre-load static module data
 	self.configOptions = LoadModule("Modules/ConfigOptions")
@@ -2033,7 +2034,7 @@ end
 function CompareTabClass:CalculatePowerStat(selection, output, calcBase)
 	local withChange = output
 	local baseline = calcBase
-	if baseline.Minion and not selection.stat == "FullDPS" then
+	if baseline.Minion and selection.stat ~= "FullDPS" then
 		withChange = withChange.Minion
 		baseline = baseline.Minion
 	end
@@ -2392,34 +2393,43 @@ function CompareTabClass:ComparePowerBuilder(compareEntry, powerStat, categories
 		for _, cGroup in ipairs(cGroups) do
 			local sig = self:GetSocketGroupSignature(cGroup)
 			if sig ~= "" and not pSignatures[sig] then
-				-- Temporarily add this socket group to primary build and recalculate
+				-- Temporarily add this socket group to primary build and recalculate.
+				-- WHY: pcall ensures t_remove always runs even if getMiscCalculator throws,
+				-- preventing the temp group from permanently corrupting the primary build's socket list.
 				t_insert(pGroups, cGroup)
 				self.primaryBuild.buildFlag = true
 
-				-- Get a fresh calculator with the added group
-				local gemCalcFunc, gemCalcBase = self.calcs.getMiscCalculator(self.primaryBuild)
-				local impact = self:CalculatePowerStat(powerStat, gemCalcBase, calcBase)
+				local gemCalcBase
+				local ok, calcErr = pcall(function()
+					local _, base = self.calcs.getMiscCalculator(self.primaryBuild)
+					gemCalcBase = base
+				end)
 
-				-- Remove the temporarily added group
+				-- Always remove the temporarily added group
 				t_remove(pGroups)
 				self.primaryBuild.buildFlag = true
 
-				local impactStr, impactVal, combinedImpactStr, impactPercent = formatImpact(impact)
-				local label = self:GetSocketGroupLabel(cGroup)
+				if not ok then
+					ConPrintf("ComparePowerReport gem calc error: %s", tostring(calcErr))
+				elseif gemCalcBase then
+					local impact = self:CalculatePowerStat(powerStat, gemCalcBase, calcBase)
+					local impactStr, impactVal, combinedImpactStr, impactPercent = formatImpact(impact)
+					local label = self:GetSocketGroupLabel(cGroup)
 
-				t_insert(results, {
-					category = "Gem",
-					categoryColor = colorCodes.GEM,
-					nameColor = colorCodes.GEM,
-					name = label,
-					impact = impactVal,
-					impactStr = impactStr,
-					impactPercent = impactPercent,
-					combinedImpactStr = combinedImpactStr,
-					pathDist = nil,
-					perPoint = nil,
-					perPointStr = nil,
-				})
+					t_insert(results, {
+						category = "Gem",
+						categoryColor = colorCodes.GEM,
+						nameColor = colorCodes.GEM,
+						name = label,
+						impact = impactVal,
+						impactStr = impactStr,
+						impactPercent = impactPercent,
+						combinedImpactStr = combinedImpactStr,
+						pathDist = nil,
+						perPoint = nil,
+						perPointStr = nil,
+					})
+				end
 			end
 			processed = processed + 1
 			if coroutine.running() and GetTime() - start > 100 then
@@ -2530,8 +2540,13 @@ function CompareTabClass:RunComparePowerReport(compareEntry)
 	-- Resume coroutine
 	if self.comparePowerCoroutine then
 		local res, errMsg = coroutine.resume(self.comparePowerCoroutine)
-		if launch and launch.devMode and not res then
-			error(errMsg)
+		if not res then
+			if launch and launch.devMode then
+				error(errMsg)
+			else
+				-- WHY: surface errors in production so they appear in the console rather than silently dying
+				ConPrintf("ComparePowerReport error: %s", tostring(errMsg))
+			end
 		end
 		if coroutine.status(self.comparePowerCoroutine) == "dead" then
 			self.comparePowerCoroutine = nil

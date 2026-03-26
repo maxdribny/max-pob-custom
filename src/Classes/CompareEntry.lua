@@ -9,6 +9,10 @@ local s_format = string.format
 local m_min = math.min
 local m_max = math.max
 
+-- WHY: BuildDisplayStats returns static tables; loading it once at module level
+-- avoids re-executing the file on every CompareEntry instantiation.
+local _buildDisplayStats, _minionDisplayStats, _extraSaveStats = LoadModule("Modules/BuildDisplayStats")
+
 local CompareEntryClass = newClass("CompareEntry", "ControlHost", function(self, xmlText, label)
 	self.ControlHost()
 
@@ -44,8 +48,10 @@ local CompareEntryClass = newClass("CompareEntry", "ControlHost", function(self,
 	self.buildFlag = false
 	self.outputRevision = 1
 
-	-- Display stats (same as primary build uses)
-	self.displayStats, self.minionDisplayStats, self.extraSaveStats = LoadModule("Modules/BuildDisplayStats")
+	-- Display stats (same as primary build uses; module loaded once at file level)
+	self.displayStats = _buildDisplayStats
+	self.minionDisplayStats = _minionDisplayStats
+	self.extraSaveStats = _extraSaveStats
 
 	-- Load from XML
 	if xmlText then
@@ -290,9 +296,8 @@ function CompareEntryClass:RefreshSkillSelectControls(controls, mainGroup, suffi
 	end
 	controls.mainSkill.enabled = #displaySkillList > 1
 	controls.mainSkill.selIndex = mainActiveSkill
-	controls.mainSkill.shown = true
 	hideAllSkillControls()
-	controls.mainSkill.shown = true -- restore after hideAll
+	controls.mainSkill.shown = true -- restore: mainSkill is always shown once a skill list exists
 
 	local activeSkill = displaySkillList[mainActiveSkill] or displaySkillList[1]
 	if not activeSkill then return end
