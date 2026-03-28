@@ -118,6 +118,7 @@ function main:Init()
 	self.showFlavourText = true
 	self.showAnimations = true
 	self.showAllItemAffixes = true
+	self.sideBarWidth = 312
 	self.errorReadingSettings = false
 
 	if not SetDPIScaleOverridePercent then SetDPIScaleOverridePercent = function(scale) end end
@@ -625,6 +626,9 @@ function main:LoadSettings(ignoreBuild)
 				if node.attrib.showAllItemAffixes then
 					self.showAllItemAffixes = node.attrib.showAllItemAffixes == "true"
 				end
+				if node.attrib.sideBarWidth then
+					self.sideBarWidth = m_max(250, m_min(700, tonumber(node.attrib.sideBarWidth) or 312))
+				end
 				if node.attrib.dpiScaleOverridePercent then
 					self.dpiScaleOverridePercent = tonumber(node.attrib.dpiScaleOverridePercent) or 0
 					SetDPIScaleOverridePercent(self.dpiScaleOverridePercent)
@@ -760,6 +764,7 @@ function main:SaveSettings()
 		showFlavourText = tostring(self.showFlavourText),
 		showAnimations = tostring(self.showAnimations),
 		showAllItemAffixes = tostring(self.showAllItemAffixes),
+		sideBarWidth = tostring(self.sideBarWidth),
 		dpiScaleOverridePercent = tostring(self.dpiScaleOverridePercent),
 	} })
 	local res, errMsg = common.xml.SaveXMLFile(setXML, self.userPath.."Settings.xml")

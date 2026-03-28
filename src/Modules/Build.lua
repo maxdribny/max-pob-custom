@@ -1183,8 +1183,61 @@ function buildMode:OnFrame(inputEvents)
 	-- Update contents of main skill dropdowns
 	self:RefreshSkillSelectControls(self.controls, self.mainSocketGroup, "")
 
+	-- Update sidebar control widths to match the current sideBarWidth each frame.
+	-- WHY: DropDownControl.CheckDroppedWidth reads .width directly (not via GetProperty),
+	-- so function-valued widths cannot be used for those controls; numeric updates are simpler.
+	local contentW = main.sideBarWidth - 12
+	self.controls.modeConfig.x = contentW
+	self.controls.mainSkillLabel.width = contentW
+	self.controls.mainSocketGroup.width = contentW
+	self.controls.mainSkill.width = contentW
+	self.controls.mainSkillPart.width = contentW
+	self.controls.statBox.width = contentW
+
+	-- Sidebar resize: hover detection and left-button drag on the divider bar.
+	-- The hit zone is 12px wide centred on the 4-px divider, so it falls outside
+	-- all sidebar controls (which end 8px before the divider).
+	local cursorX, cursorY = GetCursorPos()
+	local dividerLeft = main.sideBarWidth - 4
+	local sideBarHitZone = not main.popups[1]
+				and cursorY >= 32
+				and cursorX >= dividerLeft - 4
+				and cursorX <= dividerLeft + 8
+
+	if main.popups[1] then
+		-- Safety: cancel any in-progress drag when a popup opens
+		self.sideBarResizing = false
+	elseif self.sideBarResizing then
+		-- WHY: drive width from absolute cursor X each frame so motion is
+		-- smooth even if events are coalesced or skipped.
+		main.sideBarWidth = m_max(250, m_min(700,
+			self.sideBarResizeStartWidth + (cursorX - self.sideBarResizeStartX)))
+		-- End drag on LEFTBUTTON up; consume the event so tabs don't react to it
+		for i = #inputEvents, 1, -1 do
+			local ev = inputEvents[i]
+			if ev and ev.type == "KeyUp" and ev.key == "LEFTBUTTON" then
+				self.sideBarResizing = false
+				table.remove(inputEvents, i)
+				break
+			end
+		end
+	else
+		-- Begin drag on LEFTBUTTON down inside the hit zone; consume the event
+		-- so nothing underneath the divider reacts to the click.
+		for i = #inputEvents, 1, -1 do
+			local ev = inputEvents[i]
+			if ev and ev.type == "KeyDown" and ev.key == "LEFTBUTTON" and sideBarHitZone then
+				self.sideBarResizing = true
+				self.sideBarResizeStartX = cursorX
+				self.sideBarResizeStartWidth = main.sideBarWidth
+				table.remove(inputEvents, i)
+				break
+			end
+		end
+	end
+
 	-- Draw contents of current tab
-	local sideBarWidth = 312
+	local sideBarWidth = main.sideBarWidth
 	local tabViewPort = {
 		x = sideBarWidth,
 		y = 32,
@@ -1225,7 +1278,11 @@ function buildMode:OnFrame(inputEvents)
 	-- Draw side bar background
 	SetDrawColor(0.1, 0.1, 0.1)
 	DrawImage(nil, 0, 32, sideBarWidth - 4, main.screenH - 32)
-	SetDrawColor(0.85, 0.85, 0.85)
+	if self.sideBarResizing or sideBarHitZone then
+		SetDrawColor(1, 1, 1)   -- bright white when hovered or actively resizing
+	else
+		SetDrawColor(0.85, 0.85, 0.85)
+	end
 	DrawImage(nil, sideBarWidth - 4, 32, 4, main.screenH - 32)
 
 
