@@ -1194,6 +1194,14 @@ function buildMode:OnFrame(inputEvents)
 	self.controls.mainSkillPart.width = contentW
 	self.controls.statBox.width = contentW
 
+	-- Keep the stat box column split proportional to the current viewport width.
+	-- Default: statBox.width=300, viewport=280 (300-20 for scrollbar+borders),
+	-- name column right-edge at 170 = 170/280 of the viewport.
+	local statViewportW = contentW - 20
+	local col1X = m_floor(statViewportW * 170 / 280)
+	self.controls.statBox.columns[1].x = col1X
+	self.controls.statBox.columns[2].x = col1X + 4
+
 	-- Sidebar resize: hover detection and left-button drag on the divider bar.
 	-- The hit zone is 12px wide centred on the 4-px divider, so it falls outside
 	-- all sidebar controls (which end 8px before the divider).
@@ -1217,6 +1225,8 @@ function buildMode:OnFrame(inputEvents)
 			local ev = inputEvents[i]
 			if ev and ev.type == "KeyUp" and ev.key == "LEFTBUTTON" then
 				self.sideBarResizing = false
+				-- Regenerate stat list so baked-in centred x values use the new width
+				self:RefreshStatList()
 				table.remove(inputEvents, i)
 				break
 			end
@@ -1676,14 +1686,14 @@ function buildMode:AddDisplayStatList(statList, actor)
 							if skillData.skillPart then
 								t_insert(statBoxList, {
 									height = 14,
-									align = "CENTER_X", x = 140,
+									align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2),
 									"^8"..skillData.skillPart,
 								})
 							end
 							if skillData.source then
 								t_insert(statBoxList, {
 									height = 14,
-									align = "CENTER_X", x = 140,
+									align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2),
 									colorCodes.WARNING.."from " ..skillData.source,
 								})
 							end
@@ -1775,13 +1785,13 @@ function buildMode:RefreshStatList()
 	if self.calcsTab.mainEnv.player.mainSkill.infoMessage then
 			if #self.calcsTab.mainEnv.player.mainSkill.infoMessage > 40 then
 				for line in string.gmatch(self.calcsTab.mainEnv.player.mainSkill.infoMessage, "([^:]+)") do
-					t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, colorCodes.CUSTOM .. line})
+					t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), colorCodes.CUSTOM .. line})
 				end
 			else
-				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, colorCodes.CUSTOM .. self.calcsTab.mainEnv.player.mainSkill.infoMessage})
+				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), colorCodes.CUSTOM .. self.calcsTab.mainEnv.player.mainSkill.infoMessage})
 			end
 		if self.calcsTab.mainEnv.player.mainSkill.infoMessage2 then
-			t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, "^8" .. self.calcsTab.mainEnv.player.mainSkill.infoMessage2})
+			t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), "^8" .. self.calcsTab.mainEnv.player.mainSkill.infoMessage2})
 		end
 	end
 	if self.calcsTab.mainEnv.minion then
@@ -1790,13 +1800,13 @@ function buildMode:RefreshStatList()
 			-- Split the line if too long
 			if #self.calcsTab.mainEnv.minion.mainSkill.infoMessage > 40 then
 				for line in string.gmatch(self.calcsTab.mainEnv.minion.mainSkill.infoMessage, "([^:]+)") do
-					t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, colorCodes.CUSTOM .. line})
+					t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), colorCodes.CUSTOM .. line})
 				end
 			else
-				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, colorCodes.CUSTOM .. self.calcsTab.mainEnv.minion.mainSkill.infoMessage})
+				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), colorCodes.CUSTOM .. self.calcsTab.mainEnv.minion.mainSkill.infoMessage})
 			end
 			if self.calcsTab.mainEnv.minion.mainSkill.infoMessage2 then
-				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, "^8" .. self.calcsTab.mainEnv.minion.mainSkill.infoMessage2})
+				t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), "^8" .. self.calcsTab.mainEnv.minion.mainSkill.infoMessage2})
 			end
 		end
 		self:AddDisplayStatList(self.minionDisplayStats, self.calcsTab.mainEnv.minion)
@@ -1805,7 +1815,7 @@ function buildMode:RefreshStatList()
 	end
 	if self.calcsTab.mainEnv.player.mainSkill.skillFlags.disable then
 		t_insert(statBoxList, { height = 16, "^7Skill disabled:" })
-		t_insert(statBoxList, { height = 14, align = "CENTER_X", x = 140, self.calcsTab.mainEnv.player.mainSkill.disableReason })
+		t_insert(statBoxList, { height = 14, align = "CENTER_X", x = m_floor((main.sideBarWidth - 32) / 2), self.calcsTab.mainEnv.player.mainSkill.disableReason })
 	end
 	self:AddDisplayStatList(self.displayStats, self.calcsTab.mainEnv.player)
 	self:InsertItemWarnings()
