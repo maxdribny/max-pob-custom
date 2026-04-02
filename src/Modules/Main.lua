@@ -26,6 +26,10 @@ LoadModule("Modules/BuildSiteTools")
 -- Load as global so other modules can access the same instance
 ToastNotification = LoadModule("Modules/ToastNotification")
 
+-- Initialize file logging (store globally for shutdown)
+_Logger = LoadModule("Modules/Logger")
+_Logger:Init(launch.rootPath or ".")
+
 --[[if launch.devMode then
 	for skillName, skill in pairs(data.enchantments.Helmet) do
 		for _, mod in ipairs(skill.ENDGAME) do
@@ -337,6 +341,9 @@ function main:Shutdown()
 	self:CallMode("Shutdown")
 	self.POESESSID = ""
 	self:SaveSettings()
+	if _Logger then
+		_Logger:Close()
+	end
 end
 
 function main:OnFrame()
