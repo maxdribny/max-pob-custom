@@ -5,7 +5,17 @@
 --
 
 local t_insert = table.insert
+local t_concat = table.concat
 local t_sort = table.sort
+local function stripColorCodes(text)
+	return tostring(text or ""):gsub("%^x%x%x%x%x%x%x", ""):gsub("%^%x", "")
+end
+-- Only these report categories are requested for right-click copy.
+local copyableNameCategories = {
+	Tree = true,
+	Item = true,
+	Gem = true,
+}
 
 local ComparePowerReportListClass = newClass("ComparePowerReportListControl", "ListControl", function(self, anchor, rect)
 	self.ListControl(anchor, rect, 18, "VERTICAL", false)
@@ -63,6 +73,34 @@ function ComparePowerReportListClass:Draw(viewPort, noTooltip)
 	end
 end
 
+function ComparePowerReportListClass:OnHoverKeyUp(key)
+	if key ~= "RIGHTBUTTON" then
+		return
+	end
+	local index = self:GetHoverIndex()
+	local entry = index and self.list[index]
+	if not entry or not entry.name or not copyableNameCategories[entry.category] then
+		return
+	end
+	self:SelectIndex(index)
+	local rowHeaders = {}
+	local rowValues = {}
+	for column, columnData in ipairs(self.colList) do
+		rowHeaders[column] = stripColorCodes(self:GetColumnProperty(columnData, "label") or "")
+		rowValues[column] = stripColorCodes(self:GetRowValue(column, index, entry))
+	end
+	local rowText = t_concat(rowHeaders, "\t") .. "\n" .. t_concat(rowValues, "\t")
+	local controls = {}
+	controls.label = new("LabelControl", nil, {0, 20, 0, 16}, "^7Copy this full report row (all columns) to clipboard?")
+	controls.copy = new("ButtonControl", nil, {-45, 50, 130, 20}, "Copy to Clipboard", function()
+		Copy(rowText:gsub("\n", "\r\n"))
+		main:ClosePopup()
+	end)
+	controls.cancel = new("ButtonControl", nil, {95, 50, 80, 20}, "Cancel", function()
+		main:ClosePopup()
+	end)
+	main:OpenPopup(460, 85, "Copy Compare Report Row", controls, "copy", nil, "cancel")
+end
 function ComparePowerReportListClass:ReSort(colIndex)
 	local compare = function(a, b) return a > b end
 
