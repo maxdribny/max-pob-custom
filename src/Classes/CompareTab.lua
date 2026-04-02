@@ -122,6 +122,11 @@ local CompareTabClass = newClass("CompareTab", "ControlHost", "Control", functio
 	-- Items expanded mode (false = compact names only, true = full item details inline)
 	self.itemsExpandedMode = false
 
+	-- Price Build state
+	self.itemPrices = {}        -- slotName -> {status="loading"/"done"/"error", amount, currency, error}
+	self.priceBuildActive = false
+	self.tradeRequests = nil    -- lazy-initialized TradeQueryRequests instance
+
 	-- Tooltip for calcs hover breakdown
 	self.calcsTooltip = new("Tooltip")
 
@@ -464,28 +469,7 @@ function CompareTabClass:InitControls()
 
 	-- Price Build button - anchored after the Config sub-tab in the top bar
 	self.controls.priceBuildBtn = new("ButtonControl", {"LEFT", self.controls.subTabConfig, "RIGHT"}, {16, 0, 100, 20}, "Price Build", function()
-		if not main.POESESSID or main.POESESSID == "" then
-			local popupControls = {}
-			popupControls.sessionInput = new("EditControl", nil, {0, 18, 350, 20}, "", nil, "%X", 32)
-			popupControls.sessionInput:SetProtected(true)
-			popupControls.sessionInput.placeholder = "Enter your POESESSID here"
-			popupControls.sessionInput.tooltipText = "Found in browser cookies at pathofexile.com while logged in.\nF12 > Application > Cookies > POESESSID"
-			popupControls.save = new("ButtonControl", {"TOPRIGHT", popupControls.sessionInput, "TOP"}, {-8, 26, 90, 20}, "Save", function()
-				main.POESESSID = popupControls.sessionInput.buf
-				main:ClosePopup()
-				main:SaveSettings()
-				self:StartPriceBuild()
-			end)
-			popupControls.save.enabled = function()
-				return #popupControls.sessionInput.buf == 32
-			end
-			popupControls.cancel = new("ButtonControl", {"TOPLEFT", popupControls.sessionInput, "TOP"}, {8, 26, 90, 20}, "Cancel", function()
-				main:ClosePopup()
-			end)
-			main:OpenPopup(384, 76, "Session ID Required", popupControls)
-		else
-			self:StartPriceBuild()
-		end
+		self:OpenPriceBuildPopup()
 	end)
 	self.controls.priceBuildBtn.shown = function()
 		return #self.compareEntries > 0
@@ -1527,11 +1511,254 @@ function CompareTabClass:BuildBuySimilarURL(item, slotName, controls, modEntries
 	return url
 end
 
--- Start the Price Build flow: fetch trade prices for all compared items.
--- Called after session ID is confirmed valid.
-function CompareTabClass:StartPriceBuild()
-	-- TODO: Steps 3-5 — iterate compared items, query trade API, display prices
-	main:OpenMessagePopup("Price Build", "Price Build coming soon!\nSession ID accepted.")
+-- Lazy-init a TradeQueryRequests instance and register its ProcessQueue with the frame loop.
+function CompareTabClass:GetOrCreateTradeRequests()
+	if not self.tradeRequests then
+		self.tradeRequests = new("TradeQueryRequests")
+		self.tradeRequests.maxFetchPerSearch = 1
+		main.onFrameFuncs["ComparePriceRequests"] = function()
+			self.tradeRequests:ProcessQueue()
+		end
+	end
+	return self.tradeRequests
+end
+
+-- Open the Price Build settings popup (realm/league + optional session entry).
+function CompareTabClass:OpenPriceBuildPopup()
+	local needsSession = not main.POESESSID or main.POESESSID == ""
+	local popupWidth = 440
+	local leftMargin = 20
+	local ctrlY = 25
+	local controls = {}
+	local tradeReqs = self:GetOrCreateTradeRequests()
+
+	local function fetchLeagues(realmApiId)
+		controls.leagueDrop:SetList({"Loading..."})
+		controls.leagueDrop.selIndex = 1
+		tradeReqs:FetchLeagues(realmApiId, function(leagues, errMsg)
+			if errMsg or not leagues then
+				controls.leagueDrop:SetList({"Standard"})
+				return
+			end
+			local list = {}
+			for _, league in ipairs(leagues) do
+				if not league:find("Hardcore") and not league:find("Ruthless") and
+						league ~= "Standard" then
+					t_insert(list, 1, league)
+				else
+					t_insert(list, league)
+				end
+			end
+			t_insert(list, "Standard")
+			t_insert(list, "Hardcore")
+			t_insert(list, "Ruthless")
+			t_insert(list, "Hardcore Ruthless")
+			controls.leagueDrop:SetList(list)
+		end)
+	end
+
+	if needsSession then
+		controls.sessionLabel = new("LabelControl", {"TOPLEFT", nil, "TOPLEFT"}, {leftMargin, ctrlY + 2, 0, 16}, "^7POESESSID:")
+		controls.sessionInput = new("EditControl", {"LEFT", controls.sessionLabel, "RIGHT"}, {8, -2, 300, 20}, "", nil, "%X", 32)
+		controls.sessionInput:SetProtected(true)
+		controls.sessionInput.placeholder = "Paste your session ID here"
+		controls.sessionInput.tooltipText = "Found in browser cookies at pathofexile.com while logged in.\nF12 > Application > Cookies > POESESSID"
+		ctrlY = ctrlY + 30
+	end
+
+	controls.realmLabel = new("LabelControl", {"TOPLEFT", nil, "TOPLEFT"}, {leftMargin, ctrlY + 2, 0, 16}, "^7Realm:")
+	controls.realmDrop = new("DropDownControl", {"LEFT", controls.realmLabel, "RIGHT"}, {8, -2, 80, 20}, {"PC", "PS4", "Xbox"}, function(index, value)
+		fetchLeagues(REALM_API_IDS[value] or "pc")
+	end)
+	controls.leagueLabel = new("LabelControl", {"LEFT", controls.realmDrop, "RIGHT"}, {12, 0, 0, 16}, "^7League:")
+	controls.leagueDrop = new("DropDownControl", {"LEFT", controls.leagueLabel, "RIGHT"}, {4, 0, 160, 20}, {"Loading..."})
+	controls.leagueDrop.enabled = function()
+		return controls.leagueDrop.list[1] ~= "Loading..."
+	end
+	fetchLeagues("pc")
+	ctrlY = ctrlY + 38
+
+	controls.start = new("ButtonControl", nil, {-45, ctrlY, 80, 20}, "Start", function()
+		if needsSession then
+			main.POESESSID = controls.sessionInput.buf
+			main:SaveSettings()
+		end
+		local realm = REALM_API_IDS[controls.realmDrop:GetSelValue()] or "pc"
+		local league = controls.leagueDrop:GetSelValue()
+		main:ClosePopup()
+		self:StartPriceBuild(realm, league)
+	end)
+	controls.start.enabled = function()
+		local sessionOk = not needsSession or #controls.sessionInput.buf == 32
+		return sessionOk and controls.leagueDrop.list[1] ~= "Loading..."
+	end
+	controls.cancel = new("ButtonControl", nil, {45, ctrlY, 80, 20}, "Cancel", function()
+		main:ClosePopup()
+	end)
+
+	local popupH = ctrlY + 38
+	main:OpenPopup(popupWidth, popupH, "Price Build", controls)
+end
+
+-- Build a trade JSON query for a single item with -5% applied to all stat minimums.
+function CompareTabClass:BuildPriceQuery(item, slotName)
+	local isUnique = item.rarity == "UNIQUE" or item.rarity == "RELIC"
+	local queryTable = {
+		query = {
+			status = { option = "online" },
+			stats = {{ type = "and", filters = {} }},
+		},
+		sort = { price = "asc" }
+	}
+	local queryFilters = {
+		trade_filters = {
+			filters = { sale_type = { option = "buyout" } }
+		}
+	}
+
+	-- Shared: collect mods that have trade IDs (mirrors the Buy popup's enabled-checkbox logic:
+	-- findTradeModId returns nil for fixed stats, non-nil only for variable/searchable ones)
+	local modTypeSources = {
+		{ list = item.implicitModLines, type = "implicit" },
+		{ list = item.enchantModLines,  type = "enchant"  },
+		{ list = item.scourgeModLines,  type = "explicit" },
+		{ list = item.explicitModLines, type = "explicit" },
+		{ list = item.crucibleModLines, type = "explicit" },
+	}
+	local candidateMods = {}
+	for _, source in ipairs(modTypeSources) do
+		if source.list then
+			for _, modLine in ipairs(source.list) do
+				if item:CheckModLineVariant(modLine) then
+					local tradeId = findTradeModId(modLine.line, source.type)
+					if tradeId then
+						local value = modLineValue(modLine.line)
+						t_insert(candidateMods, { tradeId = tradeId, value = value })
+					end
+				end
+			end
+		end
+	end
+
+	if isUnique then
+		-- Search by name + base type; include all variable mods (usually 0-2 on a unique)
+		local tradeName = (item.title or item.name):gsub("^Foulborn%s+", "")
+		queryTable.query.name = tradeName
+		queryTable.query.type = item.baseName
+		if item.foulborn then
+			queryFilters.misc_filters = { filters = { foulborn_item = { option = "true" } } }
+		end
+		for _, mod in ipairs(candidateMods) do
+			local filter = { id = mod.tradeId }
+			if mod.value > 0 then
+				filter.value = { min = m_floor(mod.value * 0.95) }
+			end
+			t_insert(queryTable.query.stats[1].filters, filter)
+		end
+	else
+		-- Category filter
+		local categoryStr = getTradeCategory(slotName, item)
+		if categoryStr then
+			queryFilters.type_filters = { filters = { category = { option = categoryStr } } }
+		end
+
+		-- Defence stats with -5% floor
+		if item.armourData and item.base and item.base.armour then
+			local armourFilters = {}
+			for _, def in ipairs({
+				{ key = "Armour",       tradeKey = "ar"   },
+				{ key = "Evasion",      tradeKey = "ev"   },
+				{ key = "EnergyShield", tradeKey = "es"   },
+				{ key = "Ward",         tradeKey = "ward" },
+			}) do
+				local val = item.armourData[def.key]
+				if val and val > 0 then
+					armourFilters[def.tradeKey] = { min = m_floor(val * 0.95) }
+				end
+			end
+			if next(armourFilters) then
+				queryFilters.armour_filters = { filters = armourFilters }
+			end
+		end
+
+		-- For rares/magic: sort by value desc, take top 3 to avoid over-constraining
+		table.sort(candidateMods, function(a, b) return a.value > b.value end)
+		for i = 1, m_min(3, #candidateMods) do
+			local mod = candidateMods[i]
+			local filter = { id = mod.tradeId }
+			if mod.value > 0 then
+				filter.value = { min = m_floor(mod.value * 0.95) }
+			end
+			t_insert(queryTable.query.stats[1].filters, filter)
+		end
+	end
+
+	if next(queryFilters) then
+		queryTable.query.filters = queryFilters
+	end
+
+	return dkjson.encode(queryTable)
+end
+
+-- Fetch prices for all compared items. Stores results in self.itemPrices keyed by slotName.
+function CompareTabClass:StartPriceBuild(realm, league)
+	local compareEntry = self:GetActiveCompare()
+	if not compareEntry then return end
+
+	local requests = self:GetOrCreateTradeRequests()
+	local baseSlots = {
+		"Weapon 1", "Weapon 2", "Helmet", "Body Armour",
+		"Gloves", "Boots", "Amulet", "Ring 1", "Ring 2", "Belt",
+	}
+
+	self.itemPrices = {}
+	self.priceBuildActive = true
+	local pending = 0
+
+	for _, slotName in ipairs(baseSlots) do
+		local cSlot = compareEntry.itemsTab and compareEntry.itemsTab.slots
+				and compareEntry.itemsTab.slots[slotName]
+		local cItem = cSlot and compareEntry.itemsTab.items
+				and compareEntry.itemsTab.items[cSlot.selItemId]
+
+		if cItem then
+			self.itemPrices[slotName] = { status = "loading" }
+			pending = pending + 1
+
+			local ok, queryJson = pcall(function()
+				return self:BuildPriceQuery(cItem, slotName)
+			end)
+
+			if not ok or not queryJson then
+				ConPrintf("[PriceBuild] Query build failed for %s: %s", slotName, tostring(queryJson))
+				self.itemPrices[slotName] = { status = "error", error = "Query build failed" }
+				pending = pending - 1
+			else
+				local slot = slotName  -- capture for async closure
+				requests:SearchWithQuery(realm, league, queryJson, function(items, errMsg)
+					if errMsg or not items or #items == 0 then
+						ConPrintf("[PriceBuild] %s: %s", slot, errMsg or "no results")
+						self.itemPrices[slot] = { status = "error", error = errMsg or "No results" }
+					else
+						local first = items[1]
+						self.itemPrices[slot] = {
+							status   = "done",
+							amount   = first.amount,
+							currency = first.currency,
+						}
+					end
+					pending = pending - 1
+					if pending <= 0 then
+						self.priceBuildActive = false
+					end
+				end)
+			end
+		end
+	end
+
+	if pending == 0 then
+		self.priceBuildActive = false
+	end
 end
 
 -- Open the import popup for adding a comparison build
@@ -3119,7 +3346,7 @@ local ITEM_BOX_W = 310
 local ITEM_BOX_H = 20
 
 local function drawCompactSlotRow(drawY, slotLabel, pItem, cItem,
-	colWidth, cursorX, cursorY, maxLabelW, primaryItemsTab, compareItemsTab, pWarn, cWarn)
+	colWidth, cursorX, cursorY, maxLabelW, primaryItemsTab, compareItemsTab, pWarn, cWarn, priceEntry)
 
 	local pName = pItem and pItem.name or "(empty)"
 	local cName = cItem and cItem.name or "(empty)"
@@ -3169,7 +3396,25 @@ local function drawCompactSlotRow(drawY, slotLabel, pItem, cItem,
 	SetDrawColor(0.05, 0.05, 0.05)
 	DrawImage(nil, cBoxX + 1, drawY + 1, cBoxW - 2, ITEM_BOX_H - 2)
 	SetDrawColor(1, 1, 1)
-	DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - 8))
+	-- If a price entry exists, shrink name and draw price right-aligned inside the box
+	if priceEntry and cItem then
+		local priceText, priceColor
+		if priceEntry.status == "loading" then
+			priceText = "..."
+			priceColor = "^8"
+		elseif priceEntry.status == "done" then
+			priceText = tostring(priceEntry.amount or "?") .. " " .. (priceEntry.currency or "?")
+			priceColor = "^2"
+		else
+			priceText = "N/A"
+			priceColor = "^1"
+		end
+		local priceW = DrawStringWidth(14, "VAR", priceText) + 8
+		DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - priceW - 8))
+		DrawString(cBoxX + cBoxW - 4, drawY + 3, "RIGHT", 14, "VAR", priceColor .. priceText)
+	else
+		DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - 8))
+	end
 
 	-- Draw buttons
 	local b1Hover, b2Hover, b3Hover, b2X, b2Y, b2W, b2H
@@ -3476,7 +3721,8 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 				rowHoverItem, rowHoverItemsTab, rowHoverX, rowHoverY, rowHoverW, rowHoverH =
 				drawCompactSlotRow(drawY, slotName, pItem, cItem,
 					colWidth, cursorX, cursorY, maxLabelW,
-					self.primaryBuild.itemsTab, compareEntry.itemsTab)
+					self.primaryBuild.itemsTab, compareEntry.itemsTab, nil, nil,
+					self.itemPrices[slotName])
 
 			if rowHoverItem then
 				hoverItem = rowHoverItem
