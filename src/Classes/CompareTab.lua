@@ -1406,7 +1406,7 @@ function CompareTabClass:BuildBuySimilarURL(item, slotName, controls, modEntries
 	local queryFilters = {
 		trade_filters = {
 			filters = {
-				sale_type = { option = "buyout" }
+				sale_type = { option = "priced" }
 			}
 		}
 	}
@@ -1612,7 +1612,7 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 	}
 	local queryFilters = {
 		trade_filters = {
-			filters = { sale_type = { option = "buyout" } }
+			filters = { sale_type = { option = "priced" } }
 		}
 	}
 
