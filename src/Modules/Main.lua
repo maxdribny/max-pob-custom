@@ -335,6 +335,7 @@ end
 
 function main:Shutdown()
 	self:CallMode("Shutdown")
+	self.POESESSID = ""
 	self:SaveSettings()
 end
 

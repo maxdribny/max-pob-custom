@@ -462,6 +462,35 @@ function CompareTabClass:InitControls()
 		return self.compareViewMode == "ITEMS" and self:GetActiveCompare() ~= nil
 	end
 
+	-- Price Build button - anchored after the Config sub-tab in the top bar
+	self.controls.priceBuildBtn = new("ButtonControl", {"LEFT", self.controls.subTabConfig, "RIGHT"}, {16, 0, 100, 20}, "Price Build", function()
+		if not main.POESESSID or main.POESESSID == "" then
+			local popupControls = {}
+			popupControls.sessionInput = new("EditControl", nil, {0, 18, 350, 20}, "", nil, "%X", 32)
+			popupControls.sessionInput:SetProtected(true)
+			popupControls.sessionInput.placeholder = "Enter your POESESSID here"
+			popupControls.sessionInput.tooltipText = "Found in browser cookies at pathofexile.com while logged in.\nF12 > Application > Cookies > POESESSID"
+			popupControls.save = new("ButtonControl", {"TOPRIGHT", popupControls.sessionInput, "TOP"}, {-8, 26, 90, 20}, "Save", function()
+				main.POESESSID = popupControls.sessionInput.buf
+				main:ClosePopup()
+				main:SaveSettings()
+				self:StartPriceBuild()
+			end)
+			popupControls.save.enabled = function()
+				return #popupControls.sessionInput.buf == 32
+			end
+			popupControls.cancel = new("ButtonControl", {"TOPLEFT", popupControls.sessionInput, "TOP"}, {8, 26, 90, 20}, "Cancel", function()
+				main:ClosePopup()
+			end)
+			main:OpenPopup(384, 76, "Session ID Required", popupControls)
+		else
+			self:StartPriceBuild()
+		end
+	end)
+	self.controls.priceBuildBtn.shown = function()
+		return #self.compareEntries > 0
+	end
+
 	-- Item set dropdown for primary build
 	local itemsShown = function()
 		return self.compareViewMode == "ITEMS" and self:GetActiveCompare() ~= nil
@@ -1390,7 +1419,13 @@ function CompareTabClass:BuildBuySimilarURL(item, slotName, controls, modEntries
 		},
 		sort = { price = "asc" }
 	}
-	local queryFilters = {}
+	local queryFilters = {
+		trade_filters = {
+			filters = {
+				sale_type = { option = "buyout" }
+			}
+		}
+	}
 
 	if isUnique then
 		-- Search by unique name
@@ -1490,6 +1525,13 @@ function CompareTabClass:BuildBuySimilarURL(item, slotName, controls, modEntries
 	url = url .. "?q=" .. urlEncode(queryJson)
 
 	return url
+end
+
+-- Start the Price Build flow: fetch trade prices for all compared items.
+-- Called after session ID is confirmed valid.
+function CompareTabClass:StartPriceBuild()
+	-- TODO: Steps 3-5 — iterate compared items, query trade API, display prices
+	main:OpenMessagePopup("Price Build", "Price Build coming soon!\nSession ID accepted.")
 end
 
 -- Open the import popup for adding a comparison build
