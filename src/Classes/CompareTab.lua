@@ -1648,7 +1648,7 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 		for _, mod in ipairs(candidateMods) do
 			local filter = { id = mod.tradeId }
 			if mod.value > 0 then
-				filter.value = { min = m_floor(mod.value * 0.95) }
+				filter.value = { min = m_floor(mod.value * 0.90) }
 			end
 			t_insert(queryTable.query.stats[1].filters, filter)
 		end
@@ -1670,7 +1670,7 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 			}) do
 				local val = item.armourData[def.key]
 				if val and val > 0 then
-					armourFilters[def.tradeKey] = { min = m_floor(val * 0.95) }
+					armourFilters[def.tradeKey] = { min = m_floor(val * 0.90) }
 				end
 			end
 			if next(armourFilters) then
@@ -1684,7 +1684,7 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 			local mod = candidateMods[i]
 			local filter = { id = mod.tradeId }
 			if mod.value > 0 then
-				filter.value = { min = m_floor(mod.value * 0.95) }
+				filter.value = { min = m_floor(mod.value * 0.90) }
 			end
 			t_insert(queryTable.query.stats[1].filters, filter)
 		end
