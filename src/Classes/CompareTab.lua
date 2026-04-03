@@ -474,6 +474,9 @@ function CompareTabClass:InitControls()
 	self.controls.priceBuildBtn.shown = function()
 		return #self.compareEntries > 0
 	end
+	self.controls.priceBuildBtn.enabled = function()
+		return self.compareViewMode == "ITEMS"
+	end
 
 	-- Item set dropdown for primary build
 	local itemsShown = function()
@@ -1581,6 +1584,7 @@ function CompareTabClass:OpenPriceBuildPopup()
 	controls.start = new("ButtonControl", nil, {-45, ctrlY, 80, 20}, "Start", function()
 		if needsSession then
 			main.POESESSID = controls.sessionInput.buf
+			main.POESESSIDTimestamp = os.time()
 			main:SaveSettings()
 		end
 		local realm = REALM_API_IDS[controls.realmDrop:GetSelValue()] or "pc"
@@ -3400,32 +3404,29 @@ local function drawCompactSlotRow(drawY, slotLabel, pItem, cItem,
 	SetDrawColor(0.05, 0.05, 0.05)
 	DrawImage(nil, cBoxX + 1, drawY + 1, cBoxW - 2, ITEM_BOX_H - 2)
 	SetDrawColor(1, 1, 1)
-	-- If a price entry exists, shrink name and draw price right-aligned inside the box
-	if priceEntry and cItem then
-		local priceText, priceColor
-		if priceEntry.status == "loading" then
-			priceText = "..."
-			priceColor = "^8"
-		elseif priceEntry.status == "done" then
-			priceText = tostring(priceEntry.amount or "?") .. " " .. (priceEntry.currency or "?")
-			priceColor = "^2"
-		else
-			priceText = "N/A"
-			priceColor = "^1"
-		end
-		local priceW = DrawStringWidth(14, "VAR", priceText) + 8
-		DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - priceW - 8))
-		DrawString(cBoxX + cBoxW - 4, drawY + 3, "RIGHT", 14, "VAR", priceColor .. priceText)
-	else
-		DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - 8))
-	end
+	DrawString(cBoxX + 4, drawY + 2, "LEFT", 16, "VAR", fitItemName(cColor, cName, cBoxW - 8))
 
-	-- Draw buttons
+	-- Draw buttons and price after them
 	local b1Hover, b2Hover, b3Hover, b2X, b2Y, b2W, b2H
 	if cItem then
 		local btnStartX = cBoxX + cBoxW + 6
 		b1Hover, b2Hover, b3Hover, b2X, b2Y, b2W, b2H =
 			drawCopyButtons(cursorX, cursorY, btnStartX, drawY + 1)
+		-- Draw price after all buttons (Buy+Copy+Copy+Use = 3*60 + 2*4 = 188px) with 8px gap
+		if priceEntry then
+			local priceText, priceColor
+			if priceEntry.status == "loading" then
+				priceText = "..."
+				priceColor = "^8"
+			elseif priceEntry.status == "done" then
+				priceText = tostring(priceEntry.amount or "?") .. " " .. (priceEntry.currency or "?")
+				priceColor = "^2"
+			else
+				priceText = "N/A"
+				priceColor = "^1"
+			end
+			DrawString(btnStartX + 196, drawY + 3, "LEFT", 14, "VAR", priceColor .. priceText)
+		end
 	end
 
 	-- Determine hovered item and tooltip anchor position

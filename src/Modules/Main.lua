@@ -615,6 +615,11 @@ function main:LoadSettings(ignoreBuild)
 				end
 				if node.attrib.POESESSID then
 					self.POESESSID = node.attrib.POESESSID or ""
+					local ts = tonumber(node.attrib.POESESSIDTimestamp) or 0
+					if self.POESESSID ~= "" and (os.time() - ts) > 48 * 3600 then
+						self.POESESSID = ""
+					end
+					self.POESESSIDTimestamp = ts
 				end
 				if node.attrib.invertSliderScrollDirection then
 					self.invertSliderScrollDirection = node.attrib.invertSliderScrollDirection == "true"
@@ -766,6 +771,7 @@ function main:SaveSettings()
 		migrateEldritchImplicits = tostring(self.migrateEldritchImplicits),
 		notSupportedModTooltips = tostring(self.notSupportedModTooltips),
 		POESESSID = self.POESESSID,
+		POESESSIDTimestamp = self.POESESSID ~= "" and tostring(self.POESESSIDTimestamp or os.time()) or "",
 		invertSliderScrollDirection = tostring(self.invertSliderScrollDirection),
 		disableDevAutoSave = tostring(self.disableDevAutoSave),
 		showPublicBuilds = tostring(self.showPublicBuilds),
