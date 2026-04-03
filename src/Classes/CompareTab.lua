@@ -1605,16 +1605,12 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 	local isUnique = item.rarity == "UNIQUE" or item.rarity == "RELIC"
 	local queryTable = {
 		query = {
-			status = { option = "online" },
+			status = { option = "securable" },
 			stats = {{ type = "and", filters = {} }},
 		},
 		sort = { price = "asc" }
 	}
-	local queryFilters = {
-		trade_filters = {
-			filters = { sale_type = { option = "priced" } }
-		}
-	}
+	local queryFilters = {}
 
 	-- Shared: collect mods that have trade IDs (mirrors the Buy popup's enabled-checkbox logic:
 	-- findTradeModId returns nil for fixed stats, non-nil only for variable/searchable ones)
