@@ -1735,6 +1735,8 @@ function CompareTabClass:StartPriceBuild(realm, league)
 				pending = pending - 1
 			else
 				local slot = slotName  -- capture for async closure
+				ConPrintf("[PriceBuild] Searching for %s (item: %s, rarity: %s)", slot, cItem.name, cItem.rarity)
+				ConPrintf("[PriceBuild] Query: %s", queryJson)
 				requests:SearchWithQuery(realm, league, queryJson, function(items, errMsg)
 					if errMsg or not items or #items == 0 then
 						ConPrintf("[PriceBuild] %s: %s", slot, errMsg or "no results")
