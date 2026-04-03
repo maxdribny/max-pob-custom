@@ -1764,6 +1764,51 @@ function CompareTabClass:StartPriceBuild(realm, league)
 		end
 	end
 
+	-- Price jewels in the compare build
+	local jewelSlots = self:GetJewelComparisonSlots(compareEntry)
+	for _, jewelEntry in ipairs(jewelSlots) do
+		local cItem = jewelEntry.cItem
+		local cNodeAllocated = jewelEntry.cNodeAllocated
+
+		-- Only price jewels that are allocated in the compare build
+		if cItem and cNodeAllocated then
+			local slotName = "Jewel " .. jewelEntry.nodeId
+			self.itemPrices[slotName] = { status = "loading" }
+			pending = pending + 1
+
+			local ok, queryJson = pcall(function()
+				return self:BuildPriceQuery(cItem, slotName)
+			end)
+
+			if not ok or not queryJson then
+				ConPrintf("[PriceBuild] Query build failed for %s: %s", slotName, tostring(queryJson))
+				self.itemPrices[slotName] = { status = "error", error = "Query build failed" }
+				pending = pending - 1
+			else
+				local slot = slotName  -- capture for async closure
+				ConPrintf("[PriceBuild] Searching for %s (item: %s, rarity: %s)", slot, cItem.name, cItem.rarity)
+				ConPrintf("[PriceBuild] Query: %s", queryJson)
+				requests:SearchWithQuery(realm, league, queryJson, function(items, errMsg)
+					if errMsg or not items or #items == 0 then
+						ConPrintf("[PriceBuild] %s: %s", slot, errMsg or "no results")
+						self.itemPrices[slot] = { status = "error", error = errMsg or "No results" }
+					else
+						local first = items[1]
+						self.itemPrices[slot] = {
+							status   = "done",
+							amount   = first.amount,
+							currency = first.currency,
+						}
+					end
+					pending = pending - 1
+					if pending <= 0 then
+						self.priceBuildActive = false
+					end
+				end)
+			end
+		end
+	end
+
 	if pending == 0 then
 		self.priceBuildActive = false
 	end
@@ -3836,6 +3881,23 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 				-- Copy/Buy buttons for compare jewel
 				if cItem then
 					local b1Hover, b2Hover, b3Hover, b2X, b2Y, b2W, b2H = drawCopyButtons(cursorX, cursorY, vp.width - 196, drawY + 1)
+					-- Draw price after buttons if available
+					local priceEntry = self.itemPrices["Jewel " .. jEntry.nodeId]
+					if priceEntry then
+						local priceText, priceColor
+						if priceEntry.status == "loading" then
+							priceText = "..."
+							priceColor = "^8"
+						elseif priceEntry.status == "done" then
+							priceText = tostring(priceEntry.amount or "?") .. " " .. (priceEntry.currency or "?")
+							priceColor = "^2"
+						else
+							priceText = "N/A"
+							priceColor = "^1"
+						end
+						SetDrawColor(1, 1, 1)
+						DrawString(vp.width - 196 + 196 + 8, drawY + 3, "LEFT", 14, "VAR", priceColor .. priceText)
+					end
 					if b2Hover then
 						hoverCopyUseItem = cItem
 						hoverCopyUseSlotName = jEntry.pSlotName
@@ -3884,7 +3946,8 @@ function CompareTabClass:DrawItems(vp, compareEntry, inputEvents)
 					rowHoverItem, rowHoverItemsTab, rowHoverX, rowHoverY, rowHoverW, rowHoverH =
 					drawCompactSlotRow(drawY, jEntry.label, pItem, cItem,
 						colWidth, cursorX, cursorY, maxJewelLabelW,
-						self.primaryBuild.itemsTab, compareEntry.itemsTab, pWarn, cWarn)
+						self.primaryBuild.itemsTab, compareEntry.itemsTab, pWarn, cWarn,
+						self.itemPrices["Jewel " .. jEntry.nodeId])
 
 				if rowHoverItem then
 					hoverItem = rowHoverItem
