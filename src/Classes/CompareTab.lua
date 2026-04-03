@@ -1641,15 +1641,21 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 	end
 
 	if isUnique then
-		-- Search by name + base type only (uniques have fixed properties)
+		-- Search by name + base type; include only variable mods (candidateMods already excludes
+		-- fixed mods since findTradeModId returns nil for them)
 		local tradeName = (item.title or item.name):gsub("^Foulborn%s+", "")
 		queryTable.query.name = tradeName
 		queryTable.query.type = item.baseName
 		if item.foulborn then
 			queryFilters.misc_filters = { filters = { foulborn_item = { option = "true" } } }
 		end
-		-- Don't filter by mods for unique items - the trade API doesn't searchable mod IDs consistently
-		-- and unique items have fixed properties anyway
+		for _, mod in ipairs(candidateMods) do
+			local filter = { id = mod.tradeId }
+			if mod.value > 0 then
+				filter.value = { min = m_floor(mod.value * 0.95) }
+			end
+			t_insert(queryTable.query.stats[1].filters, filter)
+		end
 	else
 		-- Category filter
 		local categoryStr = getTradeCategory(slotName, item)
@@ -1692,8 +1698,8 @@ function CompareTabClass:BuildPriceQuery(item, slotName)
 		queryTable.query.filters = queryFilters
 	end
 
-	-- Remove empty stats array for unique items
-	if isUnique and #queryTable.query.stats[1].filters == 0 then
+	-- Remove stats array if no mod filters were added (avoids sending empty stats to the API)
+	if #queryTable.query.stats[1].filters == 0 then
 		queryTable.query.stats = nil
 	end
 
