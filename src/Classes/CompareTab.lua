@@ -1518,7 +1518,7 @@ end
 function CompareTabClass:GetOrCreateTradeRequests()
 	if not self.tradeRequests then
 		self.tradeRequests = new("TradeQueryRequests")
-		self.tradeRequests.maxFetchPerSearch = 1
+		self.tradeRequests.maxFetchPerSearch = 5
 		main.onFrameFuncs["ComparePriceRequests"] = function()
 			self.tradeRequests:ProcessQueue()
 		end
@@ -1748,11 +1748,11 @@ function CompareTabClass:StartPriceBuild(realm, league)
 						ConPrintf("[PriceBuild] %s: %s", slot, errMsg or "no results")
 						self.itemPrices[slot] = { status = "error", error = errMsg or "No results" }
 					else
-						local first = items[1]
+						local median = items[math.min(3, #items)]
 						self.itemPrices[slot] = {
 							status   = "done",
-							amount   = first.amount,
-							currency = first.currency,
+							amount   = median.amount,
+							currency = median.currency,
 						}
 					end
 					pending = pending - 1
@@ -1793,11 +1793,11 @@ function CompareTabClass:StartPriceBuild(realm, league)
 						ConPrintf("[PriceBuild] %s: %s", slot, errMsg or "no results")
 						self.itemPrices[slot] = { status = "error", error = errMsg or "No results" }
 					else
-						local first = items[1]
+						local median = items[math.min(3, #items)]
 						self.itemPrices[slot] = {
 							status   = "done",
-							amount   = first.amount,
-							currency = first.currency,
+							amount   = median.amount,
+							currency = median.currency,
 						}
 					end
 					pending = pending - 1
