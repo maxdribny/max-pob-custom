@@ -8,7 +8,7 @@ local Logger = {}
 
 function Logger:Init(repoRoot)
 	self.repoRoot = repoRoot or "."
-	self.logsDir = self.repoRoot .. "/logs"
+	self.logsDir = self.repoRoot .. "/../logs"
 	self.logFile = nil
 	self.originalConPrintf = ConPrintf
 	self.loggingEnabled = false
