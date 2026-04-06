@@ -38,7 +38,12 @@ function Logger:Init(repoRoot)
 	-- Override global ConPrintf to also write to file
 	local logger = self
 	ConPrintf = function(fmt, ...)
-		local msg = string.format(tostring(fmt), ...)
+		local msg
+		if select('#', ...) > 0 then
+			msg = string.format(tostring(fmt), ...)
+		else
+			msg = tostring(fmt)
+		end
 		logger:OriginalConPrintf(msg)
 		if logger.loggingEnabled then
 			logger:Write("[" .. os.date("%H:%M:%S") .. "] " .. msg)
