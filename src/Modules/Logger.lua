@@ -72,7 +72,7 @@ end
 function Logger:OriginalConPrintf(msg)
 	-- Call the original ConPrintf from SimpleGraphic
 	if self.originalConPrintf then
-		self.originalConPrintf(msg)
+		self.originalConPrintf("%s", msg)
 	end
 end
 
