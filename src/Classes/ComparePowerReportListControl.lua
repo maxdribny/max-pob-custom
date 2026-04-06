@@ -143,6 +143,26 @@ function ComparePowerReportListClass:ReList()
 	end
 end
 
+function ComparePowerReportListClass:GetReportAsText()
+	if not self.reportData or #self.list == 0 then
+		return nil
+	end
+	local lines = {}
+	local headers = {}
+	for _, col in ipairs(self.colList) do
+		t_insert(headers, (stripColorCodes(col.label or "")))
+	end
+	t_insert(lines, t_concat(headers, "\t"))
+	for index, entry in ipairs(self.list) do
+		local row = {}
+		for col = 1, #self.colList do
+			t_insert(row, (stripColorCodes(self:GetRowValue(col, index, entry))))
+		end
+		t_insert(lines, t_concat(row, "\t"))
+	end
+	return t_concat(lines, "\r\n")
+end
+
 function ComparePowerReportListClass:GetRowValue(column, index, entry)
 	if column == 1 then
 		return (entry.categoryColor or "^7") .. entry.category

@@ -698,6 +698,20 @@ function CompareTabClass:InitControls()
 	-- Power report list control (static height, own scrollbar)
 	self.controls.comparePowerReportList = new("ComparePowerReportListControl", nil, {0, 0, 750, 250})
 	self.controls.comparePowerReportList.shown = powerReportShown
+
+	-- Copy Results button for the power report
+	self.controls.comparePowerCopyBtn = new("ButtonControl", nil, {0, 0, 110, 20}, "Copy Results", function()
+		local text = self.controls.comparePowerReportList:GetReportAsText()
+		if text then
+			Copy(text)
+		end
+	end)
+	self.controls.comparePowerCopyBtn.shown = powerReportShown
+	self.controls.comparePowerCopyBtn.enabled = function()
+		return not self.comparePowerCoroutine
+			and self.comparePowerResults ~= nil
+			and #self.controls.comparePowerReportList.list > 0
+	end
 end
 
 -- Get a short display name from a build name (strips "AccountName - " prefix)
@@ -2931,6 +2945,8 @@ function CompareTabClass:DrawSummary(vp, compareEntry)
 	-- Header
 	SetDrawColor(1, 1, 1)
 	DrawString(LAYOUT.powerReportLeft, drawY, "LEFT", 20, "VAR", "^7Compare Power Report")
+	self.controls.comparePowerCopyBtn.x = vp.x + LAYOUT.powerReportLeft + 230
+	self.controls.comparePowerCopyBtn.y = vp.y + drawY + 1
 	drawY = drawY + 24
 
 	-- Run the coroutine driver (advances calculation each frame)
