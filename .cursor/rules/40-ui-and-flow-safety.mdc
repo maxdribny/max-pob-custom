@@ -1,0 +1,22 @@
+---
+description: UI and runtime flow safety (desktop app interactions)
+globs:
+  - "src/Classes/**/*.lua"
+  - "src/Modules/Build.lua"
+  - "src/Modules/Main.lua"
+  - "src/Launch.lua"
+---
+
+UI and runtime flow changes are easy to break subtly. Prefer conservative edits.
+
+## Interaction + state safety
+
+- Avoid changing **mode transitions**, popup flows, or control lock/enable logic unless required.
+- Preserve **keybindings** and dev-mode behavior unless the change explicitly targets them.
+- When modifying UI controls, keep layout/measurement logic stable (don’t “clean up” geometry code without a clear need).
+
+## Serialization compatibility
+
+- Be careful with anything that impacts build save/load behavior (XML sections, defaults, migration/conversion prompts).
+- Prefer backwards-compatible changes when possible.
+

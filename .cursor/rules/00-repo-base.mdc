@@ -1,0 +1,22 @@
+---
+description: Repo-wide rules for Path of Building Community (Lua/LuaJIT desktop app)
+alwaysApply: true
+---
+
+This repository is **Path of Building Community** (Lua/LuaJIT desktop application). It is **not** a web app or a TypeScript/npm project.
+
+## Operating principles
+
+- Prefer **minimal diffs** and **behavior preservation**. Avoid drive-by reformatting, renames, or wide refactors.
+- Preserve compatibility with the existing runtime + LuaJIT 5.1 environment.
+- Be cautious with any change that affects:
+  - **build serialization** (XML), **import/export codes**, trade query formats, or clipboard payloads
+  - **calculation correctness** (offence/defence/ailments/triggers), including rounding and edge-case guards
+  - **UI flow/state** (mode transitions, popups, control enable/lock logic) and **keybindings**
+  - **update/manifest** behavior (`manifest.xml`, `UpdateCheck.lua`, `UpdateApply.lua`)
+
+## Upstream workflow (fork hygiene)
+
+- `dev` is treated as the upstream-tracking staging branch (upstream is the official PoB Community repo).
+- Keep custom work isolated to the fork’s custom branches and feature branches; avoid landing custom changes directly on `dev` unless explicitly requested.
+

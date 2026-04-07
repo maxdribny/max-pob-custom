@@ -1,0 +1,27 @@
+---
+description: Tests, golden fixtures, and CI parity
+globs:
+  - "spec/**/*.lua"
+  - "spec/TestBuilds/**/*.{xml,lua}"
+  - "docker-compose.yml"
+  - ".github/workflows/test.yml"
+---
+
+## Running tests (preferred)
+
+- Use Docker to match CI:
+
+```bash
+docker-compose up
+```
+
+CI runs `busted --lua=luajit` in `ghcr.io/pathofbuildingcommunity/pathofbuilding-tests:latest`.
+
+## Fixtures / golden outputs
+
+- Treat `spec/TestBuilds/` as **golden fixtures**.\n+- Avoid regenerating expected outputs unless the change is intended and reviewed carefully.
+
+## ModCache check in CI
+
+- CI regenerates and diffs `src/Data/ModCache.lua`. If you change mod parsing, ensure regeneration stays consistent.
+

@@ -1,0 +1,23 @@
+---
+description: Lua/LuaJIT conventions for this codebase
+globs:
+  - "**/*.lua"
+---
+
+## Lua/LuaJIT compatibility
+
+- Assume **LuaJIT 5.1**. Use `bit.*` helpers for bitwise operations (don’t rely on Lua 5.3+ operators).
+- Lua patterns are **Lua pattern syntax**, not regex.
+
+## Match local style
+
+- Keep edits **surgical**: don’t re-indent entire files, reorder large tables, or normalize quotes unless necessary.
+- Follow existing patterns in the touched file/module:
+  - local aliasing (`local m_floor = math.floor`, etc.)
+  - table formatting and ordering conventions used nearby
+
+## Module + class idioms used here
+
+- Prefer the repo’s module loading helpers: `LoadModule(...)` / `PLoadModule(...)` rather than introducing new loaders.
+- For UI/OO code, match the in-repo class system from `src/Modules/Common.lua` (`newClass`, `new`) instead of introducing a new OO pattern.
+

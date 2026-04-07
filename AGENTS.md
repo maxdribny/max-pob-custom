@@ -1,138 +1,170 @@
 # AGENTS.md
 
-This file provides guidance to WARP (warp.dev) when working with code in this repository.
+This file documents how to work effectively in this repository (structure, architecture, conventions, run/test commands) and the operational rules an AI agent should follow when making changes.
 
-## What this project is
-Path of Building Community (PoBC) is an offline build planner for Path of Exile. It runs on a custom C++-backed runtime (`SimpleGraphic`) and is written almost entirely in **LuaJIT 5.1**. The executable (`runtime/Path of Building.exe`) loads `src/Launch.lua`, which in turn bootstraps the rest of the application.
+## Project overview
 
-## Running the program
-Launch directly from the repository root — dev mode is auto-detected when a local `manifest.xml` is missing a `branch`/`platform` attribute:
+This repo is a fork of **Path of Building Community** (an offline build planner for Path of Exile). The application code is primarily **Lua/LuaJIT** and runs inside a bundled runtime (`runtime/`) that contains the executable, native libs, and embedded Lua libraries.
 
-```
-runtime/Path of Building.exe
-```
+## Project structure
 
-Dev-mode keybindings:
-- `F5` — hot-reload (applies like an in-place update)
-- `Ctrl+~` — toggle in-app console
-- `Ctrl+F5` — full restart + regenerate `src/Data/ModCache.lua`
-- Hold `Alt` — extended tooltip debugging (shows raw internal mods, unrecognised mod text, node IDs)
-- Hold `Ctrl` at launch — force-rebuild ModCache
+- **`src/`**: Main application source.
+  - **`Launch.lua`**: Program entry point under the SimpleGraphic host. Determines dev mode, loads `Modules/Main`, drives frame loop, and update checks.
+  - **`Modules/`**: Core “modules” implementing the app logic and calculations.
+  - **`Classes/`**: UI controls and higher-level UI components (tabs, dialogs, etc.), built on the in-repo class system (`Modules/Common.lua`).
+  - **`Data/`**: Large game-data tables (many are generated; see “Generated data” below).
+  - **`TreeData/`**: Passive tree assets/data by game version.
+  - **`Export/`**: Data export/generation pipeline (scripts + helpers) used to regenerate `src/Data/*` from Path of Exile game data.
+  - **`HeadlessWrapper.lua`**: Headless host stubs for running PoB logic/tests without the full graphics runtime (used by CI).
+  - **`UpdateCheck.lua` / `UpdateApply.lua`**: Updater implementation (manifest-based).
+  - **`logs/`**: Local runtime logs (not part of the app logic).
+- **`runtime/`**: Bundled runtime assets + embedded Lua libs (e.g. `xml`, `base64`, `sha1`) and fonts/graphics host assets.
+  - On Windows, you typically run `runtime/Path{space}of{space}Building.exe`.
+- **`spec/`**: Automated tests (Busted).
+  - **`spec/System/*.lua`**: System/unit specs.
+  - **`spec/TestBuilds/`**: “Golden” build fixtures (`.xml` and generated `.lua` output snapshots).
+  - **`spec/GenerateBuilds.lua`**: Generates/upgrades the golden `.lua` outputs from `.xml` fixtures.
+- **`.github/workflows/`**: CI pipelines; tests are run in a container image that includes LuaJIT + Busted.
+- **`docker-compose.yml`**: Local test runner using the same container image as CI.
+- **`manifest.xml`**: Updater manifest (file hashes + sources).
+- **Convenience scripts**
+  - **`run.bat`**: Runs the app from `runtime/` on Windows.
+  - **`sync-upstream.sh`**, **`get_upstream_updates.bat`**: Fetch upstream and merge `upstream/dev` → `dev` → custom integration branch.
 
-## Running tests
-Tests use **Busted** (LuaJIT). The easiest path is Docker:
+## Architecture (high level)
+
+- **Entry + host**: `src/Launch.lua` runs under the SimpleGraphic host (bundled in the runtime) and loads `Modules/Main`.
+- **Modes**: The app has at least two top-level modes: build list and build view (see `Modules/Main.lua` per `docs/rundown.md`).
+- **UI**:
+  - `Classes/*` are UI controls (buttons, dropdowns, tabs, dialogs).
+  - Tabs like Tree/Skills/Items/Calcs/Config are implemented as classes and orchestrated from `Modules/Build.lua`.
+- **Calculations**:
+  - Calculations are organized into `Modules/Calc*` units, with setup logic in `Modules/CalcSetup.lua` and output building in calcs modules.
+  - Mod parsing and caches are handled by modules like `Modules/ModParser.lua` and `Modules/ModTools.lua` (see docs).
+- **Data-driven engine**:
+  - A large portion of behavior depends on data tables in `src/Data/*` and `src/TreeData/*`.
+  - Many `src/Data/*.lua` files are **generated artifacts** produced by `src/Export/*`.
+
+## Key conventions
+
+### Lua style and patterns
+
+- **Module loading**: Uses `LoadModule("Modules/Foo")` / `PLoadModule(...)` patterns provided by the host/wrapper.
+- **Class system**: Classes are declared with `newClass(...)` and instantiated with `new(...)` (see `src/Modules/Common.lua`).
+- **Global-ish singletons**: It’s common to reference globals like `launch`, `main`, `common`, `data`, etc. Be careful when changing initialization order.
+
+### Generated data (very important)
+
+- Files under **`src/Data/`** may be generated. This is usually indicated by a header like:
+  - `-- This file is automatically generated, do not edit!`
+- **Rule**: If you need to change generated data, change the corresponding scripts in **`src/Export/`** and regenerate outputs, and include both script and generated output changes in the same PR/branch.
+- **ModCache**: `src/Data/ModCache.lua` is large and generated. CI checks it can be regenerated; changes to mod parsing often require updating it.
+
+### Dev mode behavior
+
+- Running the program directly from a working copy (or otherwise detected by `Launch.lua`) enables **Dev Mode**, which:
+  - Disables auto-updates
+  - Enables debugging affordances (F5 restart, console toggle, extra tooltip data, etc.)
+
+## Branching and upstream-sync workflow (this fork)
+
+Upstream is the official PoB Community repo, and this fork is structured to keep upstream updates easy to consume.
+
+- **`upstream` remote**: `PathOfBuildingCommunity/PathOfBuilding` (official source)
+- **`dev` branch**:
+  - Kept close to `upstream/dev` to make syncing straightforward.
+  - CI workflows (tests) are configured to run on PRs targeting `dev` (see `.github/workflows/test.yml`).
+- **Custom development branch**:
+  - This fork uses a custom integration branch named **`max-custom-dev`** (scripts merge `dev` into it).
+  - Your note: custom work is done from **`max-pob-custom`** and subsequent branches. In this checkout the custom integration branch is named `max-custom-dev`; treat it as the long-lived “custom changes” branch (and create feature branches off it).
+- **Sync scripts**:
+  - `sync-upstream.sh` / `get_upstream_updates.bat` perform the intended workflow:
+    - `git fetch upstream`
+    - update `dev` from `upstream/dev`
+    - merge `dev` → custom integration branch
+
+### Agent rule for branches
+
+- **Do not implement custom changes on `dev`.**
+- **Do not rewrite history on `dev` or custom branches** unless explicitly requested by the user.
+- When making changes, prefer a feature branch based on the custom integration branch (e.g. `max-custom-dev`), unless the user explicitly asks otherwise.
+
+## How to run the project (local dev)
+
+### Windows (typical)
+
+- Run the app from the repo (dev install):
+  - Run `runtime/Path{space}of{space}Building.exe`
+  - Or use `run.bat` from the repo root (expects the exe under `runtime/`).
+
+### Notes
+
+- Running from the repo typically enables **Dev Mode** (see `CONTRIBUTING.md` for dev-mode keys and debugging workflow).
+
+## How to test
+
+Tests use **Busted** with **LuaJIT**, run in a Docker container (matching CI).
+
+### Run tests (Docker)
+
+From repo root:
 
 ```bash
 docker-compose up
 ```
 
-The container image is `ghcr.io/pathofbuildingcommunity/pathofbuilding-tests:latest`. CI (`test.yml`) runs `busted --lua=luajit` directly inside the same image.
+This runs:
+- `busted --lua=luajit`
 
-To run tests outside Docker (if Busted + LuaJIT are installed locally), from the repo root:
+### Golden build fixtures
+
+- `spec/TestBuilds/*.xml` are input fixtures.
+- `spec/TestBuilds/*.lua` contain expected output snapshots.
+- `spec/GenerateBuilds.lua` can regenerate snapshots from the XML fixtures (use with care; review diffs).
+
+## Agent rules (must follow)
+
+### Safety and scope
+
+- **Do not edit generated `src/Data/*` by hand** if the file says it’s generated. Update the generator scripts in `src/Export/*` and regenerate outputs.
+- **Prefer minimal, surgical changes**. This codebase is large and data-heavy; avoid broad refactors unless requested.
+- **Preserve updater/manifest behavior** unless the task explicitly concerns updates.
+
+### Repo conventions and workflows
+
+- **Respect upstream sync workflow**:
+  - Keep `dev` as the upstream-tracking branch.
+  - Keep custom changes isolated to the custom integration branch and feature branches.
+- **Keep tests runnable**:
+  - If changing mod parsing, expect ModCache regeneration to matter and ensure it’s consistent with CI expectations.
+
+### Tooling guidance for agents
+
+- When you need to understand something, start with `docs/` (especially `docs/rundown.md`, `docs/addingMods.md`, `docs/modSyntax.md`, `docs/addingSkills.md`).
+- Use the headless path (`src/HeadlessWrapper.lua`) as the mental model for CI/test execution.
+
+## Additional developer notes
+
+### Dev-mode keybindings (when running from repo)
+
+- `F5`: restart in-place (dev mode)
+- `Ctrl+~`: toggle console (keyboard-layout dependent)
+- Hold `Alt`: extended tooltip debugging (raw internal mods, unrecognised text, node ids, etc.)
+- Hold `Ctrl` while launching: rebuild mod cache
+
+### Running tests outside Docker (optional)
+
+If you have Busted + LuaJIT locally:
 
 ```bash
 cd src && busted --lua=luajit
 ```
 
-To run a single spec file:
+### ModCache regeneration
 
-```bash
-cd src && busted --lua=luajit ../spec/System/TestDefence_spec.lua
-```
-
-Tests live in `spec/System/`. Test builds (XML) used by tests live in `spec/TestBuilds/`.
-
-## ModCache regeneration
-Whenever mod-parsing logic in `src/Modules/ModParser.lua` changes, `src/Data/ModCache.lua` must be regenerated and committed. The CI `check_modcache` job verifies this. To regenerate locally:
+When changing mod parsing, regenerate `src/Data/ModCache.lua` (CI validates regeneration):
 
 ```bash
 cd src
 REGENERATE_MOD_CACHE=1 luajit HeadlessWrapper.lua
-# or inside Docker: docker-compose run busted-tests sh -c "cd src && REGENERATE_MOD_CACHE=1 luajit HeadlessWrapper.lua"
 ```
-
-Alternatively, launch the program with `Ctrl` held to trigger cache rebuild in-app.
-
-## High-level architecture
-
-### Entry point and module loading
-`src/Launch.lua` is the program entry point. It initialises the graphics host, detects dev mode, then `PLoadModule`s `Modules/Main`. `PLoadModule` / `LoadModule` are PoB-specific wrappers around `loadfile`; there is no standard `require`-based module system. All modules execute in a shared global environment.
-
-### Two application modes
-`Modules/Main.lua` owns two top-level modes stored in `main.modes`:
-- `"LIST"` → `Modules/BuildList.lua` — the build-selection screen.
-- `"BUILD"` → `Modules/Build.lua` — the active build editor.
-
-`Build.lua` owns all UI tabs and orchestrates the calculation pipeline.
-
-### Calculation pipeline
-The calc pipeline is split across several `Modules/Calc*.lua` files, all namespaced under a single `calcs` table loaded by `Modules/Calcs.lua`:
-
-| File | Responsibility |
-|---|---|
-| `CalcSetup.lua` | Builds mod databases for player and enemy; processes nodes, jewels, flasks, items, skills |
-| `CalcPerform.lua` | Top-level calc orchestrator; calls offence/defence/triggers |
-| `CalcOffence.lua` | DPS, hit chance, damage types, ailments |
-| `CalcDefence.lua` | Life, ES, armour, resistances, mitigation |
-| `CalcTriggers.lua` | Trigger-based skill interactions |
-| `CalcActiveSkill.lua` | Per-skill output table construction |
-| `CalcSections.lua` | Calcs-tab display sections |
-| `CalcTools.lua` | Shared helpers: mod summing, gem validation |
-
-Calculation results are stored in `env.player.output` / `env.enemy.output`. Breakdown tables for the Calcs tab sit in `env.player.breakdown`.
-
-### Mod system
-Mods are the atomic unit of everything. The signature is:
-```lua
-mod(ModName, ModType, Value, source, modFlags, keywordFlags, ...extraTags)
-```
-- **ModType**: `"BASE"`, `"INC"`, `"MORE"`, `"FLAG"`, `"OVERRIDE"`, `"MAX"`, `"MIN"`
-- **ModFlags / KeywordFlags**: bitfield enums in `src/Data/Global.lua` under `ModFlag` and `KeywordFlag`
-- **ExtraTags**: `{ type = "Condition", var = "..." }`, `{ type = "Multiplier", var = "..." }`, etc. — see `docs/modSyntax.md` for the full list.
-
-`Modules/ModParser.lua` is the parser that converts raw mod text (from items, passives, etc.) into mod tables, caching results in `src/Data/ModCache.lua`. The mod is looked up in the cache at runtime; `ModParser.lua` only runs when a cache miss occurs (dev mode) or on explicit rebuild.
-
-`Classes/ModDB.lua` / `Classes/ModList.lua` / `Classes/ModStore.lua` implement the mod storage and query layer.
-
-### Data layer
-`Modules/Data.lua` bootstraps all game data: uniques, bases, skills, gems, stat descriptions, enchantments, essences, pantheons. It loads files from `src/Data/` — these are **auto-generated** (header: `-- This file is automatically generated, do not edit!`). To change them, edit scripts in `src/Export/` and re-run the exporter via the Dat Viewer.
-
-`src/Data/Global.lua` holds all enum tables (`ModFlag`, `KeywordFlag`, `SkillType`, colour codes, etc.).
-
-### UI layer
-All UI controls inherit from `Classes/Control.lua` via the `new()` class factory in `Modules/Common.lua`. Tab classes (`CalcsTab`, `ItemsTab`, `SkillsTab`, `TreeTab`, etc.) are in `src/Classes/`. They are instantiated by `Build.lua` and receive a reference to the build object.
-
-`Classes/PassiveTree.lua` loads and owns the tree graph. `Classes/PassiveSpec.lua` holds the current node allocation state. `Classes/PassiveTreeView.lua` renders the tree.
-
-### Class system
-`Modules/Common.lua` provides a minimal OO system:
-```lua
--- Define a class
-local MyClass = newClass("MyClass", "BaseClass", function(self, ...) end)
--- Instantiate
-local obj = new("MyClass", ...)
-```
-All class definitions register themselves globally by name.
-
-## Key conventions
-
-### PRs must target `dev`, not `master`
-All changes are staged in `dev` before merging to `master`.
-
-### ModCache must be committed when ModParser changes
-If your changes touch `Modules/ModParser.lua` or anything that affects mod text parsing, regenerate and commit `src/Data/ModCache.lua`. CI will fail otherwise.
-
-### Auto-generated files in `src/Data/`
-Do not hand-edit files with the `-- This file is automatically generated` header. Change the corresponding export script in `src/Export/Scripts/` instead.
-
-### Lua version
-LuaJIT 5.1. Use `bit.bor` / `bit.band` for bitwise ops (no `~` or `&` operators). String patterns use Lua pattern syntax, not PCRE.
-
-### All mod text is lowercased before parsing
-When adding entries to `ModParser.lua`, write patterns in lowercase.
-
-## Further reading
-- `docs/rundown.md` — per-file descriptions of every module.
-- `docs/addingMods.md` — step-by-step walkthrough of `ModParser.lua`.
-- `docs/modSyntax.md` — complete reference for mod/tag syntax.
-- `docs/addingSkills.md` — how skills are structured in PoB.

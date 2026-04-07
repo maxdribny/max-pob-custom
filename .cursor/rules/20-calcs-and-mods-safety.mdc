@@ -1,0 +1,26 @@
+---
+description: Safety rules for calculations and mod parsing (high risk areas)
+globs:
+  - "src/Modules/Calc*.lua"
+  - "src/Modules/Mod*.lua"
+  - "src/Classes/Mod*.lua"
+  - "src/Data/SkillStatMap.lua"
+---
+
+These areas are **high-risk**: small changes can silently affect many builds.
+
+## Change discipline
+
+- Make the **smallest** correct change; avoid refactors, rewrites, or renames.
+- Preserve existing rounding/guard behavior and edge-case handling unless the change is explicitly intended.
+- When touching parsing or calculation logic, explain the specific scenario being fixed and why it won’t break others.
+
+## Mod syntax + conventions
+
+- Follow `docs/modSyntax.md` and existing patterns in `src/Modules/ModParser.lua` / `src/Modules/ModTools.lua`.
+- Keep mod text patterns consistent with local conventions (Lua patterns, often lowercased).
+
+## ModCache expectation
+
+- If a change affects mod parsing output, expect `src/Data/ModCache.lua` to need regeneration and to be checked by CI (`check_modcache` job).
+
