@@ -14,21 +14,50 @@ local m_sin = math.sin
 local m_cos = math.cos
 local m_pi = math.pi
 
+-- Startup timing marks (collected even before Logger is initialised)
+launch._startupMarks = launch._startupMarks or {}
+local function startupMark(label)
+	if GetTime then
+		table.insert(launch._startupMarks, { label = label, t = GetTime() })
+	end
+end
+
+local function loggerMark(label)
+	if _Logger and _Logger.Mark then
+		_Logger:Mark(label)
+	else
+		startupMark(label)
+	end
+end
+
+startupMark("Main.lua start")
 LoadModule("GameVersions")
+startupMark("Loaded GameVersions")
 LoadModule("Modules/Common")
+startupMark("Loaded Modules/Common")
 LoadModule("Modules/Data")
+startupMark("Loaded Modules/Data")
 LoadModule("Modules/ModTools")
+startupMark("Loaded Modules/ModTools")
 LoadModule("Modules/ItemTools")
+startupMark("Loaded Modules/ItemTools")
 LoadModule("Modules/CalcTools")
+startupMark("Loaded Modules/CalcTools")
 LoadModule("Modules/PantheonTools")
+startupMark("Loaded Modules/PantheonTools")
 LoadModule("Modules/BuildSiteTools")
+startupMark("Loaded Modules/BuildSiteTools")
 
 -- Load as global so other modules can access the same instance
 ToastNotification = LoadModule("Modules/ToastNotification")
+startupMark("Loaded Modules/ToastNotification")
 
 -- Initialize file logging (store globally for shutdown)
+startupMark("Before Logger init")
 _Logger = LoadModule("Modules/Logger")
 _Logger:Init(launch.rootPath or ".")
+_Logger:ImportMarks(launch._startupMarks)
+_Logger:Mark("After Logger init")
 
 --[[if launch.devMode then
 	for skillName, skill in pairs(data.enchantments.Helmet) do
@@ -57,10 +86,13 @@ local tempTable2 = { }
 main = new("ControlHost")
 
 function main:Init()
+	loggerMark("main:Init start")
 	self:DetectUnicodeSupport()
+	loggerMark("DetectedUnicodeSupport")
 	self.modes = { }
 	self.modes["LIST"] = LoadModule("Modules/BuildList")
 	self.modes["BUILD"] = LoadModule("Modules/Build")
+	loggerMark("Loaded modes LIST/BUILD")
 
 	self.popups = { }
 	self.sharedItemList = { }
@@ -84,7 +116,9 @@ function main:Init()
 	end
 
 	if not ignoreBuild then
+		loggerMark("Before SetMode BUILD (Unnamed build)")
 		self:SetMode("BUILD", false, "Unnamed build")
+		loggerMark("After SetMode BUILD (Unnamed build)")
 	end
 	if launch.devMode or (GetScriptPath() == GetRuntimePath() and not launch.installedMode) then
 		-- If running in dev mode or standalone mode, put user data in the script path
@@ -132,8 +166,10 @@ function main:Init()
 		-- Not loading pre-generated cache causes it to be rebuilt
 		self.saveNewModCache = true
 	else
+		loggerMark("Before LoadModule Data/ModCache")
 		-- Load mod cache
 		LoadModule("Data/ModCache", modLib.parseModCache)
+		loggerMark("After LoadModule Data/ModCache")
 	end
 
 	--[[ this does not work properly anymore see PR #7675
@@ -146,10 +182,14 @@ function main:Init()
 	self.tooltipLines = { }
 
 	self.tree = { }
+	loggerMark("Before LoadTree latestTreeVersion")
 	self:LoadTree(latestTreeVersion)
+	loggerMark("After LoadTree latestTreeVersion")
 
 	if self.userPath then
+		loggerMark("Before ChangeUserPath")
 		self:ChangeUserPath(self.userPath, ignoreBuild)
+		loggerMark("After ChangeUserPath")
 	end
 
 	self.uniqueDB = { list = { }, loading = true }
@@ -267,6 +307,10 @@ the "Releases" section of the GitHub page.]])
 				data.printMissingMinionSkills()
 			end
 			ConPrintf("Startup time: %d ms", GetTime() - launch.startTime)
+			if _Logger then
+				_Logger:Mark("FirstFrame rendered")
+				_Logger:EmitStartupTimings()
+			end
 		end
 	}
 

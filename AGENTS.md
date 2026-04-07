@@ -148,9 +148,11 @@ This runs:
 ### Dev-mode keybindings (when running from repo)
 
 - `F5`: restart in-place (dev mode)
-- `Ctrl+~`: toggle console (keyboard-layout dependent)
+- `Ctrl+\``: toggle console (keyboard-layout dependent; sometimes shown as `Ctrl+~`)
 - Hold `Alt`: extended tooltip debugging (raw internal mods, unrecognised text, node ids, etc.)
 - Hold `Ctrl` while launching: rebuild mod cache
+
+Note: The brief console window that may appear during startup is part of the bundled `SimpleGraphic` runtime and is distinct from the in-app console above.
 
 ### Running tests outside Docker (optional)
 
