@@ -206,8 +206,13 @@ function CompareTabClass:InitControls()
 		self:OpenImportPopup()
 	end)
 
+	-- "From File..." button
+	self.controls.fromFileBtn = new("ButtonControl", {"LEFT", self.controls.importBtn, "RIGHT"}, {4, 0, 90, 20}, "From File...", function()
+		self:OpenFromFilePopup()
+	end)
+
 	-- Re-import current build button
-	self.controls.reimportBtn = new("ButtonControl", {"LEFT", self.controls.importBtn, "RIGHT"}, {4, 0, 120, 20}, "Re-import Current", function()
+	self.controls.reimportBtn = new("ButtonControl", {"LEFT", self.controls.fromFileBtn, "RIGHT"}, {4, 0, 120, 20}, "Re-import Current", function()
 		self:ReimportPrimary()
 	end)
 	self.controls.reimportBtn.tooltipFunc = function(tooltip)
@@ -1829,6 +1834,121 @@ function CompareTabClass:StartPriceBuild(realm, league)
 end
 
 -- Open the import popup for adding a comparison build
+function CompareTabClass:OpenFromFilePopup()
+	local controls = {}
+	local subPath = ""
+	local fileList = {}
+	local statusText = ""
+
+	local function buildFileList()
+		wipeTable(fileList)
+		local handle = NewFileSearch(main.buildPath..subPath.."*", true)
+		while handle do
+			t_insert(fileList, { isFolder = true, name = handle:GetFileName() })
+			if not handle:NextFile() then break end
+		end
+		handle = NewFileSearch(main.buildPath..subPath.."*.xml")
+		while handle do
+			local fileName = handle:GetFileName()
+			local entry = { isFolder = false, name = fileName:gsub("%.xml$", ""), fileName = fileName }
+			local fh = io.open(main.buildPath..subPath..fileName, "r")
+			if fh then
+				local chunk = fh:read(256)
+				fh:close()
+				local buildTag = chunk and chunk:match("(<Build.->)")
+				if buildTag then
+					entry.level = tonumber(buildTag:match('level="(%d+)"'))
+					entry.className = buildTag:match('className="([^"]+)"')
+					entry.ascendClassName = buildTag:match('ascendClassName="([^"]+)"')
+				end
+			end
+			t_insert(fileList, entry)
+			if not handle:NextFile() then break end
+		end
+		table.sort(fileList, function(a, b)
+			if a.isFolder ~= b.isFolder then return a.isFolder end
+			return a.name:lower() < b.name:lower()
+		end)
+	end
+
+	local function onPathChange(newSubPath)
+		subPath = newSubPath
+		buildFileList()
+	end
+
+	buildFileList()
+
+	controls.pathBar = new("PathControl", nil, {0, 20, 480, 24}, main.buildPath, "", onPathChange)
+
+	controls.buildList = new("ListControl", nil, {0, 58, 480, 260}, 20, "VERTICAL", false, fileList)
+	controls.buildList.colList = { { width = 480 } }
+
+	function controls.buildList:GetRowValue(column, index, item)
+		if item.isFolder then
+			return "^7[" .. item.name .. "/]"
+		end
+		if item.level and item.className then
+			local asc = (item.ascendClassName and item.ascendClassName ~= "None") and item.ascendClassName or item.className
+			return item.name .. "  ^8Lv " .. item.level .. " " .. asc
+		end
+		return item.name
+	end
+
+	function controls.buildList:OnSelect(index, item)
+		if not item.isFolder then
+			controls.nameEdit.buf = item.name
+		end
+	end
+
+	function controls.buildList:OnSelClick(index, item, doubleClick)
+		if item.isFolder and doubleClick then
+			subPath = subPath .. item.name .. "/"
+			controls.pathBar:SetSubPath(subPath)
+		end
+	end
+
+	controls.nameLabel = new("LabelControl", nil, {-185, 332, 0, 16}, "^7Name:")
+	controls.nameEdit = new("EditControl", nil, {50, 332, 310, 20}, "", "Name (optional)", nil, 100)
+	controls.status = new("LabelControl", nil, {0, 356, 0, 16})
+	controls.status.label = function() return statusText end
+	controls.go = new("ButtonControl", nil, {-45, 378, 80, 20}, "Import", function()
+		local sel = controls.buildList.selValue
+		if not sel then
+			statusText = colorCodes.WARNING .. "Select a build first"
+			return
+		end
+		if sel.isFolder then
+			subPath = subPath .. sel.name .. "/"
+			controls.pathBar:SetSubPath(subPath)
+			return
+		end
+		local fullPath = main.buildPath .. subPath .. sel.fileName
+		local fh = io.open(fullPath, "r")
+		if not fh then
+			statusText = colorCodes.NEGATIVE .. "Could not open file"
+			return
+		end
+		local xmlText = fh:read("*a")
+		fh:close()
+		if not xmlText or xmlText == "" then
+			statusText = colorCodes.NEGATIVE .. "File is empty"
+			return
+		end
+		local customName = (controls.nameEdit.buf ~= "" and controls.nameEdit.buf) or sel.name
+		local ok = self:ImportBuild(xmlText, customName)
+		if ok then
+			main:ClosePopup()
+		else
+			statusText = colorCodes.NEGATIVE .. "Failed to load build (invalid XML)"
+		end
+	end)
+	controls.cancel = new("ButtonControl", nil, {45, 378, 80, 20}, "Cancel", function()
+		main:ClosePopup()
+	end)
+
+	main:OpenPopup(500, 400, "Import Build from File", controls, "go", nil, "cancel")
+end
+
 function CompareTabClass:OpenImportPopup()
 	local controls = {}
 	-- Use a local variable for state text so it doesn't go into the controls table
