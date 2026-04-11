@@ -37,3 +37,6 @@ src/Data/TimelessJewelData/*.bin
 # Simplegraphic Debugging
 runtime/imgui.ini
 runtime/SimpleGraphic/SimpleGraphic.log
+
+# Local utility scripts
+get_upstream_updates.bat
