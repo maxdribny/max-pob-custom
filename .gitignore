@@ -38,5 +38,10 @@ src/Data/TimelessJewelData/*.bin
 runtime/imgui.ini
 runtime/SimpleGraphic/SimpleGraphic.log
 
+<<<<<<< HEAD
 # Local logs (repo root)
 logs/
+=======
+# Local utility scripts
+get_upstream_updates.bat
+>>>>>>> dev
